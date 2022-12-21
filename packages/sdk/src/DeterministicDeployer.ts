@@ -1,7 +1,8 @@
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumber, BigNumberish, Wallet } from 'ethers'
 import { hexConcat, hexlify, hexZeroPad, keccak256 } from 'ethers/lib/utils'
 import { TransactionRequest } from '@ethersproject/abstract-provider'
 import { JsonRpcProvider } from '@ethersproject/providers'
+import fs from "fs";
 
 /**
  * wrapper class for Arachnid's deterministic deployer
@@ -89,11 +90,28 @@ export class DeterministicDeployer {
     ])).slice(-40)
   }
 
-  async deterministicDeploy (ctrCode: string, salt: BigNumberish = 0): Promise<string> {
+  // async deterministicDeploy (ctrCode: string, salt: BigNumberish = 0): Promise<string> {
+  //   const addr = await this.getDeterministicDeployAddress(ctrCode, salt)
+  //   if (!await this.isContractDeployed(addr)) {
+  //     await this.provider.getSigner().sendTransaction(
+  //       await this.getDeployTransaction(ctrCode, salt))
+  //   }
+  //   return addr
+  // }
+  async deterministicDeploy (ctrCode: string, salt: BigNumberish = 0, mnemonic = './localconfig/mnemonic.txt'): Promise<string> {
+    console.log('deterministicDeploy:1 -------')
     const addr = await this.getDeterministicDeployAddress(ctrCode, salt)
+    console.log('deterministicDeploy:2 -------')
     if (!await this.isContractDeployed(addr)) {
-      await this.provider.getSigner().sendTransaction(
-        await this.getDeployTransaction(ctrCode, salt))
+      const mnemonicWallet = Wallet.fromMnemonic(fs.readFileSync(mnemonic, 'ascii').trim()).connect(this.provider)
+      console.log('deterministicDeploy:3 -------', await this.provider.listAccounts())
+      const txData = await this.getDeployTransaction(ctrCode, salt)
+      // txData.maxFeePerGas = '500000000000000'
+      // txData.maxPriorityFeePerGas = '50000000000000'
+      await mnemonicWallet.sendTransaction(
+        // await this.provider.getSigner(0).sendTransaction(
+        txData
+      )
     }
     return addr
   }
