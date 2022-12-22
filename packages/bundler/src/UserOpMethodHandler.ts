@@ -85,11 +85,14 @@ export class UserOpMethodHandler {
     if (entryPointInput.toLowerCase() !== this.config.entryPoint.toLowerCase()) {
       throw new Error(`The EntryPoint at "${entryPointInput}" is not supported. This bundler uses ${this.config.entryPoint}`)
     }
+    console.log('this entryPoint: ', this.config.entryPoint.toLowerCase());
     const simulateCall = this.entryPoint.interface.encodeFunctionData('simulateValidation', [userOp])
 
     const revert = await this.entryPoint.callStatic.simulateValidation(userOp, { gasLimit: 10e6 }).catch(e => e)
     // simulation always reverts...
     if (revert.errorName === 'FailedOp') {
+      console.log('FailedOp')
+      console.log(revert)
       let data: any
       if (revert.errorArgs.paymaster !== AddressZero) {
         data = { paymaster: revert.errorArgs.paymaster }
@@ -140,8 +143,9 @@ export class UserOpMethodHandler {
     }
 
     console.log(`UserOperation: Sender=${userOp.sender} EntryPoint=${entryPointInput} Paymaster=${hexValue(userOp.paymasterAndData)}`)
-
+    console.log('start simulateUserOp')
     await this.simulateUserOp(userOp1, entryPointInput)
+    console.log('end simulateUserOp')
     const beneficiary = await this.selectBeneficiary()
     const userOpHash = await this.entryPoint.getUserOpHash(userOp)
 
@@ -154,9 +158,13 @@ export class UserOpMethodHandler {
       throw new Error(`userOp.preVerificationGas too low: expected ${expectedPreVerificationGas} but got ${preVerificationGas}`)
     }
 
-    const gasLimit = undefined
-    debug('using gasLimit=', gasLimit)
-    await this.entryPoint.handleOps([userOp], beneficiary, { gasLimit }).catch(rethrowError)
+    const gasLimit = 20000000
+    const gasPrice = 800000000000
+    console.log('using gasLimit=', gasLimit)
+    const tx = await this.entryPoint.handleOps([userOp], beneficiary, { gasPrice, gasLimit }).catch(rethrowError)
+    console.log('tx transaction: ', tx.hash);
+    await tx.wait();
+    console.log('end handleOps')
 
     // await postExecutionDump(this.entryPoint, userOpHash)
     return userOpHash

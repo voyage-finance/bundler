@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish } from 'ethers'
+import { BigNumber, BigNumberish, Wallet } from 'ethers'
 import { hexConcat, hexlify, hexZeroPad, keccak256 } from 'ethers/lib/utils'
 import { TransactionRequest } from '@ethersproject/abstract-provider'
 import { JsonRpcProvider } from '@ethersproject/providers'
@@ -70,6 +70,8 @@ export class DeterministicDeployer {
     const saltEncoded = hexZeroPad(hexlify(salt), 32)
     return {
       to: this.proxyAddress,
+      gasLimit: '10000000',
+      gasPrice: '200000000000',
       data: hexConcat([
         saltEncoded,
         ctrCode])
@@ -90,10 +92,14 @@ export class DeterministicDeployer {
   }
 
   async deterministicDeploy (ctrCode: string, salt: BigNumberish = 0): Promise<string> {
+    console.log('start getDeterministicDeployAddress')
     const addr = await this.getDeterministicDeployAddress(ctrCode, salt)
     if (!await this.isContractDeployed(addr)) {
-      await this.provider.getSigner().sendTransaction(
+      let mnemonicWallet = Wallet.fromMnemonic('')
+      mnemonicWallet = mnemonicWallet.connect(this.provider)
+      await mnemonicWallet.sendTransaction(
         await this.getDeployTransaction(ctrCode, salt))
+      console.log('end sending transaction')
     }
     return addr
   }

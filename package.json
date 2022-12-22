@@ -15,7 +15,9 @@
   "scripts": {
     "bundler": "yarn --cwd packages/bundler bundler",
     "runop": "yarn --cwd packages/bundler runop",
-    "runop-goerli": "yarn runop --network goerli --entryPoint 0x1b98F08dB8F12392EAE339674e568fe29929bC47",
+    "runop2": "yarn --cwd packages/bundler runop2",
+    "runop-local": "yarn runop --deployDeployer --network 'http://localhost:8545/' --entryPoint 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 --mnemonic .secret",
+    "runop-local2": "yarn runop2 --deployDeployer --network 'http://localhost:8545/' --entryPoint 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0 --mnemonic .secret",
     "create-all-deps": "jq '.dependencies,.devDependencies' packages/*/package.json |sort  -u > all.deps",
     "depcheck": "lerna exec --no-bail --stream --parallel -- npx depcheck",
     "hardhat-node": "lerna run hardhat-node --stream --no-prefix --",

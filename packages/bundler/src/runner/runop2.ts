@@ -13,8 +13,20 @@ import { Command } from 'commander'
 import { erc4337RuntimeVersion } from '@account-abstraction/utils'
 import fs from 'fs'
 import { DeterministicDeployer, HttpRpcClient, SimpleAccountAPI } from '@account-abstraction/sdk'
-import { runBundler } from '../runBundler'
 import { BundlerServer } from '../BundlerServer'
+import {
+  EIP4337Manager,
+  EIP4337Manager__factory,
+  EntryPoint__factory,
+  GnosisSafe__factory,
+  SafeProxy4337,
+  SafeProxy4337__factory,
+  TestCounter__factory
+} from '../typechain'
+import { fillAndSign } from './UserOp'
+import { SingleEntryPlugin } from 'webpack'
+import { SimpleAccount__factory } from '../types'
+
 
 const ENTRY_POINT = '0x5a6c313240e2a8a868487a2e7010ce3880d04f56'
 
@@ -113,33 +125,11 @@ async function main (): Promise<void> {
     .option('--selfBundler', 'run bundler in-process (for debugging the bundler)')
 
   console.log('opts')
-  //0x0736490803771d7f8c39AcAaBaA2Fd22D4F2BC5F
   const opts = program.parse().opts()
   const provider = getDefaultProvider(opts.network) as JsonRpcProvider
   let signer: Signer
   const deployDeployer: boolean = opts.deployDeployer
   let bundler: BundlerServer | undefined
-  if (opts.selfBundler != null) {
-    // todo: if node is geth, we need to fund our bundler's account:
-    const signer = provider.getSigner()
-    const signerBalance = await provider.getBalance(signer.getAddress())
-    const account = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
-    const bal = await provider.getBalance(account)
-    if (bal.lt(parseEther('1')) && signerBalance.gte(parseEther('10000'))) {
-      console.log('funding hardhat account', account)
-      await signer.sendTransaction({
-        to: account,
-        value: parseEther('1').sub(bal)
-      })
-    }
-
-    const argv = ['node', 'exec', '--config', './localconfig/bundler.config.json']
-    if (opts.entryPoint != null) {
-      argv.push('--entryPoint', opts.entryPoint)
-    }
-    bundler = await runBundler(argv)
-    await bundler.asyncStart()
-  }
   if (opts.mnemonic != null) {
     signer = Wallet.fromMnemonic(fs.readFileSync(opts.mnemonic, 'ascii').trim()).connect(provider)
   } else {
@@ -156,13 +146,20 @@ async function main (): Promise<void> {
       throw new Error('must specify --mnemonic')
     }
   }
-  const accountOwner = signer;
+  const accountOwner = Wallet.fromMnemonic(fs.readFileSync(opts.mnemonic, 'ascii').trim()).connect(provider)
+  console.log('account owner: ', accountOwner.address)
 
   const index = 0
-  const client = await new Runner(provider, opts.bundlerUrl, accountOwner, opts.entryPoint, index).init(deployDeployer ? signer : undefined)
+  // const client = await new Runner(provider, opts.bundlerUrl, accountOwner, opts.entryPoint, index).init(deployDeployer ? signer : undefined)
 
-  const addr = await client.getAddress()
-  console.log('addr: ', addr)
+  // const addr = await client.getAddress()
+  // console.log('addr: ', addr)
+  const gnosisSafeAddr = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  const entryPointAddr = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
+  const managerAddr = '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'
+  const counterAddr = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9'
+  const safeProxyAddr = '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707'
+  const addr = '0x0165878A594ca255338adfa4d48449f69242Eb8F'
 
   async function isDeployed (addr: string): Promise<boolean> {
     return await provider.getCode(addr).then(code => code !== '0x')
@@ -171,11 +168,12 @@ async function main (): Promise<void> {
   async function getBalance (addr: string): Promise<BigNumber> {
     return await provider.getBalance(addr)
   }
+  
 
   const bal = await getBalance(addr)
   console.log('account address', addr, 'deployed=', await isDeployed(addr), 'bal=', formatEther(bal))
   //TODO: actual required val
-  const requiredBalance = parseEther('0.5')
+  const requiredBalance = parseEther('10')
   if (bal.lt(requiredBalance.div(2))) {
     console.log('funding account to', requiredBalance)
     await signer.sendTransaction({
@@ -188,15 +186,30 @@ async function main (): Promise<void> {
     console.log('not funding account. balance is enough')
   }
 
-  const dest = addr
-  const data = keccak256(Buffer.from('xihuo')).slice(0, 10)
-  console.log('data=', data)
-  await client.runUserOp(dest, data)
-  console.log('after run1')
-  // client.accountApi.overheads!.perUserOp = 30000
-  await client.runUserOp(dest, data)
-  console.log('after run2')
-  await bundler?.stop()
+
+  const safeSingleton = await new GnosisSafe__factory(accountOwner).attach(gnosisSafeAddr).connect(provider)
+  const counter = await new TestCounter__factory(accountOwner).attach(counterAddr).connect(provider)
+  const simpleAccount = await new SimpleAccount__factory().attach(addr);
+  const counter_countCallData = counter.interface.encodeFunctionData('count')
+  const simpleAccountCallData = simpleAccount.interface.encodeFunctionData('execFromEntryPoint',[counterAddr,0,counter_countCallData])
+  const safe_execTxCallData = safeSingleton.interface.encodeFunctionData('execTransactionFromModule', [counter.address, 0, counter_countCallData, 0])
+  console.log("safe_execTxCallData: ", safe_execTxCallData)
+
+  const proxy = await new SafeProxy4337__factory(accountOwner).attach(safeProxyAddr)
+  const entryPoint = await new EntryPoint__factory(accountOwner).attach(entryPointAddr)
+  const manager = await new EIP4337Manager__factory().attach(managerAddr).connect(accountOwner)
+  // console.log('start validateEip4337')
+  // await manager.callStatic.validateEip4337(gnosisSafeAddr, manager.address, { gasLimit: 10e6 })
+  // console.log('end validateEip4337')
+  const op = await fillAndSign({
+    sender: safeProxyAddr,
+    callGasLimit: 1e6,
+    callData: safe_execTxCallData
+  }, accountOwner, entryPoint)
+  const rcpt = await entryPoint.handleOps([op], accountOwner.address).then(async r => r.wait());
+  console.log('gasUsed=', rcpt.gasUsed, rcpt.transactionHash)
+  const ev = rcpt.events!.find(ev => ev.event === 'UserOperationEvent')!
+  console.log(ev)
 }
 
 void main()
