@@ -1,0 +1,47 @@
+name: API Deployment Workflow
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+jobs:
+  deployment:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{inputs.environment}}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::728465399228:role/gh-oidc-assumable-role
+          aws-region: us-west-2
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Download task definition
+        id: download-task-def
+        run: |
+          aws ecs describe-task-definition --task-definition safe-api-${{inputs.environment}} --query taskDefinition > task-definition.json
+      - name: Get image tag
+        id: get-image-tag
+        run: |
+          export SHORT_SHA=${GITHUB_SHA::7}
+          echo "::set-output name=sha::$SHORT_SHA"
+      - name: Render task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: safe-api
+          image: ${{steps.login-ecr.outputs.registry }}/safe-api:${{steps.get-image-tag.outputs.sha}}
+      - name: Deploy task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: safe-api-${{inputs.environment}}
+          cluster: ecs-safe-cluster-${{inputs.environment}}
+          wait-for-service-stability: true

@@ -139,7 +139,9 @@ async function main (): Promise<void> {
     await bundler.asyncStart()
   }
   if (opts.mnemonic != null) {
-    signer = Wallet.fromMnemonic(fs.readFileSync(opts.mnemonic, 'ascii').trim()).connect(provider)
+    // signer = Wallet.fromMnemonic(fs.readFileSync(opts.mnemonic, 'ascii').trim()).connect(provider)
+    // signer = Wallet.fromMnemonic(fs.readFileSync(opts.mnemonic, 'ascii').trim()).connect(provider)
+    signer = Wallet.fromMnemonic(process.env.BUNDLER_SIGNER_MNEMONIC as any).connect(provider)
   } else {
     try {
       const accounts = await provider.listAccounts()

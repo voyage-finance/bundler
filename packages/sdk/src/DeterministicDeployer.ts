@@ -103,7 +103,9 @@ export class DeterministicDeployer {
     const addr = await this.getDeterministicDeployAddress(ctrCode, salt)
     console.log('deterministicDeploy:2 -------')
     if (!await this.isContractDeployed(addr)) {
-      const mnemonicWallet = Wallet.fromMnemonic(fs.readFileSync(mnemonic, 'ascii').trim()).connect(this.provider)
+      // const mnemonicWallet = Wallet.fromMnemonic(fs.readFileSync(mnemonic, 'ascii').trim()).connect(this.provider)
+      // console.log("process.env.BUNDLER_SIGNER_MNEMONIC: ", process.env.BUNDLER_SIGNER_MNEMONIC)
+      const mnemonicWallet = Wallet.fromMnemonic(process.env.BUNDLER_SIGNER_MNEMONIC as any).connect(this.provider)
       console.log('deterministicDeploy:3 -------', await this.provider.listAccounts())
       const txData = await this.getDeployTransaction(ctrCode, salt)
       // txData.maxFeePerGas = '500000000000000'

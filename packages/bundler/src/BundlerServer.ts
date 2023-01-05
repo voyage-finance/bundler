@@ -28,6 +28,7 @@ export class BundlerServer {
 
     this.app.get('/', this.intro.bind(this))
     this.app.post('/', this.intro.bind(this))
+    this.app.post('/v1/health', this.health.bind(this))
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.app.post('/rpc', this.rpc.bind(this))
@@ -67,6 +68,10 @@ export class BundlerServer {
 
   intro (req: Request, res: Response): void {
     res.send(`Account-Abstraction Bundler v.${erc4337RuntimeVersion}. please use "/rpc"`)
+  }
+
+  health (req: Request, res: Response): void {
+    res.send('ok')
   }
 
   async rpc (req: Request, res: Response): Promise<void> {

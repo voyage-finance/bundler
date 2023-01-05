@@ -1,0 +1,67 @@
+name: Build and Deploy
+on:
+  - push
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Install
+        run: yarn install --pure-lockfile --non-interactive
+      - name: Preprocess
+        run: yarn preprocess
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::728465399228:role/gh-oidc-assumable-role
+          aws-region: us-west-2
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Set envs
+        run: |
+          export SHORT_SHA=${GITHUB_SHA::7}
+          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+          export REF_NAME="$(echo ${GITHUB_REF_NAME} | sed 's/[^a-zA-Z0-9]/-/g')"
+          echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${REF_NAME//\//_}-${SHORT_SHA}-${{ github.run_number }}" >> $GITHUB_ENV
+          echo IMAGE_TAG="${REF_NAME//\//_}-${SHORT_SHA}-${{ github.run_number }}"
+      - name: Build, tag, and push image to ECR
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: safe-api
+        run: |
+          docker build --cache-from=type=gha \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$REF_NAME \
+            -f ./Dockerfile .
+          if [ "$GITHUB_REF_NAME" == "main" ]; then
+            docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          fi
+          docker push -a $ECR_REGISTRY/$ECR_REPOSITORY
+  deployment:
+    name: Staging
+    with:
+      environment: staging
+    uses: ./.github/workflows/deploy.yaml
+    if: github.ref == 'refs/heads/main'
+    needs: [build, verify]

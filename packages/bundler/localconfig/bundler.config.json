@@ -1,8 +1,8 @@
 {
   "gasFactor": "1",
   "port": "3000",
-  "network": "http://0.0.0.0:8545",
-  "entryPoint": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "network": "https://polygon-rpc.com",
+  "entryPoint": "0x60F62EBDc9C046d5577B69B4162343b549166A1A",
   "beneficiary": "0x59a039e46ad42d046182368168B42a034A459251",
   "minBalance": "1",
   "mnemonic": "./localconfig/mnemonic.txt",
