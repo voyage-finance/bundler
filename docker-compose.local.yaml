@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  app:
+    image: ${BUNDLER_IMAGE}
+    restart: "always"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ".:/usr/src/app"
+    networks:
+      - "bundler_network"
+    command: bash -c "yarn bundler"
+
+networks:
+  bundler_network:
+    external:
+      name: "${NETWORK_NAME}"
