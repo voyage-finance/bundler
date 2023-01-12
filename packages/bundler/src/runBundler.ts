@@ -20,6 +20,9 @@ ethers.BigNumber.prototype[inspectCustomSymbol] = function () {
   return `BigNumber ${parseInt(this._hex)}`
 }
 
+import {loadEnv} from '../localconfig/config'
+loadEnv();
+
 const CONFIG_FILE_NAME = 'workdir/bundler.config.json'
 
 export let showStackTraces = false
@@ -118,8 +121,9 @@ export async function runBundler (argv: string[], overrideExit = true): Promise<
   let mnemonic: string
   let wallet: Wallet
   try {
-    mnemonic = fs.readFileSync(config.mnemonic, 'ascii').trim()
-    wallet = Wallet.fromMnemonic(mnemonic).connect(provider)
+    // mnemonic = fs.readFileSync(config.mnemonic, 'ascii').trim()
+    console.log("process.env.BUNDLER_SIGNER_MNEMONIC: ", process.env.BUNDLER_SIGNER_MNEMONIC)
+    wallet = Wallet.fromMnemonic(process.env.BUNDLER_SIGNER_MNEMONIC as any).connect(provider)
   } catch (e: any) {
     throw new Error(`Unable to read --mnemonic ${config.mnemonic}: ${e.message as string}`)
   }

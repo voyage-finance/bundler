@@ -8,7 +8,7 @@ services:
       - "80"
     environment:
       - "DOMAIN_NAME=${DOMAIN_NAME}"
-      - "PROXY_PASS=http://app:80"
+      - "PROXY_PASS=http://app:3000"
     volumes:
       - "../infra/nginx/conf.d:/etc/nginx/conf.d/templates"
     networks:
@@ -29,10 +29,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ".:/usr/src/app"
+      - ".:/usr/src/app/"
     networks:
       - "bundler_network"
-    command: bash -c "yarn bundler"
+    env_file:
+      - ".env.${BUNDLER_ENV}"
+      - ".env.${BUNDLER_ENV}.local"
+    command: sh -c "yarn bundler"
 
 networks:
   bundler_network:

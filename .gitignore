@@ -21,3 +21,6 @@ tsconfig.tsbuildinfo
 /packages/bundler/src/types/
 yarn-error.log
 /packages/bundler/localconfig/mnemonic.txt
+/.env.dev.local
+/.env.production.local
+/.env.staging.local

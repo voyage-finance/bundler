@@ -10,7 +10,7 @@ services:
       - ".:/usr/src/app"
     networks:
       - "bundler_network"
-    command: bash -c "yarn bundler"
+    command: "yarn bundler"
 
 networks:
   bundler_network:
